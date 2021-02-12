@@ -4,7 +4,7 @@
 using namespace std;
 
 /*
-01背包,最外层对物品种类进行循环，内层由于物品只能拿一次，所以体积从大往小循环，得到结果
+01背包,最外层对物品种类进行循环，内层由于物品只能拿一次，所以体积从大往小循环，得到结果，且初始化(没有物品的时候)dp数组的值全为零
 */
 
 int zeroPackage(vector<int>&kind,vector<int>value,vector<int>cost,int v){
