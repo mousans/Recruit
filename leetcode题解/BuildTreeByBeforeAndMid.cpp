@@ -12,7 +12,7 @@ struct TreeNode {
     TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}
     TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}
 };
-
+ 
 /**
  * 前序遍历的vector内的节点为： 根节点|左子树节点|右子树节点
  * 中序遍历的vector内的节点为： 左子树节点|根节点|右节点
