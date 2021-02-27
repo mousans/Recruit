@@ -9,7 +9,7 @@ struct TreeNode {
     TreeNode *left;
     TreeNode *right;
     TreeNode() : val(0), left(nullptr), right(nullptr) {}
-    TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}
+    TreeNode(int x) : val(x), left(nullptr), right(nullptr) {} 
     TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}
 };
  
@@ -22,7 +22,7 @@ class Solution {
 public:
     unordered_map<int, int> mps;
     TreeNode* build(vector<int>& preorder,int lPre,int rPre,vector<int>&inorder,int lIn,int rIn){
-        if(lPre>rPre){
+        if(lPre>rPre){ 
             return nullptr;
         }
         TreeNode* root = new TreeNode(preorder[lPre]);
