@@ -7,4 +7,62 @@
         a.只要使用es进行搜索，搜索结果都很快
         b.es会对搜索的结果进行评分排序，返回时，只返回评分高的请况就好
         c.就算关键词出错，es还是能够返回结果(虽然不一定很准确)
-    
+三.es查询的数据结构：
+    1.正向索引和倒排索引
+        a.正向索引：根据完整条件查找一条记录
+        b.倒排索引：根据某个词(不完整条件)查找包含条件的记录
+    2.es具体的数据结构：
+        a.term Dictionary:保存着es分词器分出来的所有单词
+        b.Term index:term Dictionary的前缀树(字典树)，压缩单词所占空间，方便后面对单词的检索
+        c.Postinglist:单词对应存在的所有文档(相当于mysql中的一行数据)ID,
+        es采用了FOR(Frame Of Reference)技术来对list进行压缩，另外使用Roaring Bitmaps对文档ID求交并集。
+
+四.es的框架(分布式):
+    1.es中相关术语与mysql的对应：
+        a.index相当于mysql中的表
+        b.document:相当于mysql中的一行元素
+        c.field:相当于mysql中的一列
+        d.mapping:相当于MySQL中的数据库
+        e.DSL:相当于sql语句
+    2.分布式相关：
+        a.MasterNode:负责维护索引元数据，切换主分片和副本分片身份等工作，如果masterNode挂了会选举一个新的节点
+        b.分片:对于一个index,es会将其数据保存到多个节点(其目的在于加快读写IO,不同分片可并行读和并行写),
+        每个es节点上的部分数据，就叫做分片
+        c.主分片和副分片:为了保证整个es系统的高可用性,es对每个分片还复制了多个副本,这些副本中有一个是主分片,
+        其他的都是副分片,数据写入时是写到主分片,副分片会复制主分片数据,如果主分片挂了,MasterNode会选择一个副分片成为主分片
+五.es的写入数据操作：
+    1.协调节点(coordinating node):转发客户端请求到目标节点的节点,es中所有的节点都是协调节点
+    2. 请求发送到对应节点和主分片后的过程:
+        a.将数据写入内存缓存区(buffer)
+        b.将数据写道translog缓存区
+        c.每隔1s数据从buffer中refresh到FileSystemCache内生成segment，此时就可通过倒排索引查找到写入的数据了(但segment还在内存中)
+        d.清空buffer
+        e.每隔5s把translog flush到磁盘
+        f.定期，定量从FileSystemCache结合stanslog内容,flush index到磁盘
+        e.主分片写完后,将数据发送给副本节点,所有节点写完后会返回ack给协调节点，协调节点返回ack给客户端，完成写入
+        *说明:
+        a.由于每个1s数据才生成segment，所以写入es后想要查到需要有1s的延迟
+        b.由于每隔5s日志才写道磁盘,所以一旦es主机挂掉后,es会丢失5s内的数据
+        c.当磁盘上的translog文件十分大或者时间到达30min时,es触发commit操作将内存的segment写入磁盘，完成持久化
+六.es的更新删除操作:
+    整个流程和写入数据流程类似,不过此时主分片不是写入新数据，而是将需要删除或更新的document打上delete标志,如果是更新操作则写入一条更新后的新记录，
+    es定期会有一个merge任务合并不同的segment,在merge的时候，如果遇到带有delete的doc就直接将其物理删除
+七.es的查询操作:
+    1.根据ID查DOC(Get):检索内存的translog->检索硬盘的translog->检索硬盘的segement
+    2.根据query匹配DOC(Query):查找内存和硬盘的segment
+    *由于数据写入时,会先写translog到缓存区,1s后生成内存的segment,所以Get操作可以说是实时的,而Query操作有1s延迟
+七.es的三种查询模式:
+    1.QUERY_AND_FETCH（查询完就返回整个Doc内容）
+    2.QUERY_THEN_FETCH（先查询出对应的Doc id ，然后再根据Doc id 匹配去对应的文档）
+    3.DFS_QUERY_THEN_FETCH(先算分，再查询)ps:这里的分指的是词频率和文档频率，频率越高,相关性也强,分越高
+八.QUERY_THEN_FETCH流程：
+    a.客户端将请求发送到某个节点
+    b.节点将请求转发到所有分片上
+    c.每个分片将自己的搜索结果的doc id发送给最初的协调节点
+    d.协调节点对返回的doc id做排序，分页等操作，产生最后结果
+    e.协调节点用doc id拉取实际的document返回给客户端
+
+
+
+
+
