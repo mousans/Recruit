@@ -1,0 +1,51 @@
+一.zookeeper的相关概念:
+    1.zookeeper的数据结构:一颗树,每个节点(Znode)都可以由路径标识
+    2.zookeeper树的节点类型:
+        a.暂时节点:当客户端和服务端断开连接的时候,Znode自动删除
+            a.1:普通暂时节点
+            a.2：带顺序的暂时节点
+        b.持久节点:当客户端和服务端断开连接的时候,Znode不会自动删除
+            b.1:普通的持久节点
+            b.2:带顺序的持久节点
+    3.zookeeper的监视器(watcher):zookeeper的客户端可以监视zookeeper节点的变化(Znode的数据变化,Znode的节点的增减变化)
+二.zookeeper的使用:zookeeper的使用主要是依靠监听+Znode节点
+    1.统一配置管理:多个主机同时监听一个Znode(该节点存放了服务的配置信息),如果配置发送变更,则节点都会得到监听事件,跟着更改配置
+    2.统一命名服务:zookeeper由两个方向：
+        a.利用zookeeper的树形结构存储将服务的名称,地址,目录信息等存到zookeeper上
+        b.利用zookeeper顺序节点的特性，制作分布式的ID生成器
+    3.负载均衡:每台工作服务器都会在启动时在servers下注册一个暂时节点,每台客户端在启动时都会取所有现在在线的工作服务器,
+    通过负载均衡算法，选择一台工作服务器，并与之建立连接，调用其dubbo接口
+    4.分布式锁:需要锁的主机都去访问某个Znode,并创建带顺序的暂时节点,创建节点完成后寻找是否有比自己创建节点还小的节点,
+    如果没有则说明抢占到了锁,继续执行,释放锁就是断开连接,节点自动删除,如果有，则监听比自己小的暂时节点,等待其释放锁。
+
+三.zookeeper的实现:
+    1.zookeeper集群中每个节点的角色:
+        a.领导者(leader):
+            a.1:事务请求唯一的处理者和调度者,保证集群事务处理的顺序性；
+            a.2:它是内部各服务器的调度者
+        b.跟随者(follower):
+            b.1:处理非事务请求,转发事务请求给leader
+            b.2:参加事务请求提案额投票(只有半数以上服务器通过,leader才能commit数据)
+            b.3:参加leader选举的投票
+        c.观察者(observer):处理非事务请求,转发事务请求给leader,但观察者不参加投票,只同步leader的状态,
+        其目的在于扩展系统，提高读取速度.
+    2.ZAB(Zookeeper Atomic Broadcast)协议:zookeeper主要依靠该协议来实现数据一致性
+        1.崩溃恢复模式(集群):集群启动时,或leader网络中断，宕机时,集群进入崩溃恢复模式,选举新leader,当leader选举出来,并且半数以上
+        的follower与leader完成同步后,集群推出崩溃恢复,进入消息广播模式
+        2.奔溃模式下的leader选举:
+                a.zxid的意义:epoch(32)+递增计数(32),对于epoch每当一轮leader产生时都会将之前的epoch加1
+                b.选择什么样的节点作为leader:由于zxid是严格递增的,所以找到拥有最大的zxid的commit事务的节点,表示其完成了所有被commit的事务更新.
+                c.老leader恢复后成为follower后的行为:新leader会让它把所有之前epoch号且还未提交的消息全部删除,然后开始同步数据
+                d.启动时leader选举:开始所有的follower都处于looking状态,他们会广播自己的当前的myid,zxid,epoch,但接受到其他主机发送的投票信息时,
+                和自己当前的信息进行比较,首先比较zxid,zxid大的胜，如果zxid相同则比较myid,myid大的胜当有半数以上服务器都选择同一台机器时,leader选择出来了
+                e.leader宕机,网络故障后的leader选举:与上面类似,一旦leader失去联系,所有follower将自己的状态设置为looking,开始上面的步骤,选举leader
+        3.数据恢复(主机):leader正常工作,一台新主机加入集群，此主机进入数据恢复模式,开始同步和leader数据,同步完成后,主机开始
+        响应客户端的非事务性请求
+        4.消息广播模式(简化的两阶段提交):
+            a.leader接受到消息请求后,赋予消息一个64位的全局唯一自增ID(zxid),通过zid可以实现事务有序执行
+            b.leader为每一个follower都开了一个先进先出的队列,将带有zxid的消息作为提案发送给所有follower;
+            c.follower收到提案,将提案写道磁盘,回复leader ack
+            d.当leader收到半数以上的ack时,leader会向所有的follower发送commit命令,同时本地也执行该消息
+            e.follower收到commit消息后会提交消息
+            *说明:observer不参与投票,只会同步leader的数据
+        
