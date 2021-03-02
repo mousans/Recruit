@@ -1,0 +1,10 @@
+一.什么是kafka:消息队列,其中把消息放到kafka的是生产组,从kafka中取消息的是消费组
+二.kafka的基本概念:
+    1.topic:逻辑上的消息队列，生产组和消费组都通过topic的名字来写入消息和读取消息
+    2.broker:kafka集群中的一台服务器
+    3.partition:一个topic由多个partition组成,每个broker都存在一个partition,其目的在于加快读写IO,
+    每个partition都可以并行读写;
+    4.主partition和备份partition:为了防止某台brker挂掉,导致服务不可用,kafka对每个partition都进行了备份(一般为3份),
+    备份partition不做读写如果主partition的broker挂掉，选取备份partition的broker成为主partition
+    5.broker数据持久化:broker得到数据后,会直接追加写入磁盘,避免随机IO
+    6.offerset:broker会记录下每个消费组读取消息的位置,用offeset来表示,消费者每次消费都需要提交
