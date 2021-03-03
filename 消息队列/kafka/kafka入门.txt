@@ -1,10 +1,51 @@
-一.什么是kafka:消息队列,其中把消息放到kafka的是生产组,从kafka中取消息的是消费组
-二.kafka的基本概念:
-    1.topic:逻辑上的消息队列，生产组和消费组都通过topic的名字来写入消息和读取消息
-    2.broker:kafka集群中的一台服务器
-    3.partition:一个topic由多个partition组成,每个broker都存在一个partition,其目的在于加快读写IO,
-    每个partition都可以并行读写;
-    4.主partition和备份partition:为了防止某台brker挂掉,导致服务不可用,kafka对每个partition都进行了备份(一般为3份),
-    备份partition不做读写如果主partition的broker挂掉，选取备份partition的broker成为主partition
-    5.broker数据持久化:broker得到数据后,会直接追加写入磁盘,避免随机IO
-    6.offerset:broker会记录下每个消费组读取消息的位置,用offeset来表示,消费者每次消费都需要提交
+一.什么是kafka:分布式,支持多分区,多副本,基于zookeeper协调的分布式消息系统,最大特性是可以实时处理大量特性
+二.kafka的特性:
+    1.高吞吐,低延迟:每秒可处理几十万条数,延迟最低只有几毫秒,每个topic可以分多个partition,消费组可以对partition进行消费
+    2.可扩展性:kafka集群支持热扩展
+    3.持久性,可靠性:消息被持久化到本地磁盘,支持数据备份,防止数据丢失
+    4.容错性:运行集群中节点宕机(有副本)
+    5.高并发:支持数千个客户端同时读写
+三.kafka基础架构:
+    1.Producer:消息的生产者,向kafka broker发送消息的客户端;
+    2.Consumer:消息的消费者,向kafka broker取消息的客户端;
+    3.consumer group:消费组,由多个consumer组成,每个consumer负责消费一个topic的不同partition,消费者之间互不影响
+    4.broker:kafka集群中的一台服务器，一个kafka集群可以包含多个broker,一个broker可以包含多个集群
+    5.topic:可以理解为一个虚拟的队列,生产者消费者都是面向topic的
+    6.partition:为了加快一个topic的并行读写IO,一个topic被分为多个partition,每个partition都分布在一台broker上,每个
+    partition都是一个独立顺序的队列
+    7.Replica:副本,为了保证集群内broker宕机后kafka集群正常工作,不丢失数据,kafka提供了副本机制,一个topic的每个分区都有
+    若干副本,包含一个leader副本,多个follower副本
+    8.leader副本:每个partition的副本老大,生产者写入消息的对象和消费者消费消息的对象
+    9.follower副本:每个分区多个副本的小弟,实时从leader处同步消息,当leader发生故障,某个follower会成为新的leader
+    10.kafka集群broker Controller的产生:kafka集群所有的broker都取zookeeper注册同一个临时节点,只有一个会成功,成功的那个会
+    成为kafka的broker Controller
+    11.leader副本的选举:当集群中一个broker宕机,broker controller会读取这个宕机broker的partition,并在选取对应ISR列表的
+    一个副本成为新的leader,如果ISR列表全挂,则会等待副本恢复，第一个恢复的副本将会成为leader
+    12.ISR列表:存储着和leader保持同步的副本列表
+    13.ISR列表的更新条件:
+        a.一定时间副本没有和leader交互,leader就将此副本从ISR列表中删除
+        b.当leader和副本的信息条数差值大于某个值的时候,leader就将其从ISR列表中删除
+四.kafka的工作流程:
+      kafka中消息按照topic分类,生产者生产消息,消费组消费消息,都是面向topic,topic是逻辑上的概念,partition是物理上的概念,由于
+    生产者写入消息会一直不断的追加写,如果只有一个文件的话,会非常大,而kafka是通过顺序查找的offset的,这样在定位offset的时候
+    会很慢,所以kafka采用了分片和索引机制,将每个partition分为多个segment,每个segment有两个文件:index和log,index存储大量
+    的索引信息,而log存储着大量的数据,索引文件的元数据指向数据文件的message的物理偏移
+五.kafka生产数据的可靠性:
+    1.生产数据的流程:为保证producer发送的数据能可靠的发送到指定的topic,topic的每个partition收到producer发送的数据,
+    都需要向producer发送ack,如果producer收到ack则进行下一轮发送,否则重新发送
+    2.ack参数配置含义:
+        a.0(至多一次):producer不等待broker的ack,这种请况下延迟最低,但broker故障会丢失数据
+        b.1(默认设置):producer等待ack,partition的leader落盘成功后会返回producer ack,这种请况下如果follower还没同步数据,
+        而leader宕机的话会将会丢失数据
+        c.-1(至少一次):producer等待ack,partition的ISR列表中的所有副本都落盘后,才返回ack,如果在leader发送ack前,
+        follower同步数据后leader宕机,则有可能产生重复数据
+六.kafka消费数据的可靠性:
+    1.消费消息流程:消费者从partition上拉取消息,到本地做对应的业务逻辑
+    2.offset的维护:
+        a.维护offset的目的:consumer有可能出现宕机之类的故障,consumer恢复后要能够从故障前的位置继续消费,所以consumer要
+        实时记录自己消费到了哪个offset
+        b.维护offset的方式:kafka0.9之前consumer将offset默认放到zookeeper(low_level API)中,
+        0.9开始offset保存在kafka内置的一个topic(high_Level API)中,该 topic 为**__consumer_offsets**
+        c.offset提交方式:
+            c.1.auto.commit.interval.ms(at most once):一旦抓到消息就更新offset,无论消费是否成功
+            c.2.手动提交(at least once):先消费完再手动更新offset,如果消费失败,则offset不变,此消息会再被消费一次 
