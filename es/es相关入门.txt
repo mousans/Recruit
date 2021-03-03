@@ -24,6 +24,9 @@
         c.field:相当于mysql中的一列
         d.mapping:相当于MySQL中的数据库
         e.DSL:相当于sql语句
+        f.translog:记录了接受到的document
+        g.segment:lucene将大的理想索引拆分成了很多小的segment,每个小的segment本质就是一个倒排索引,同时还会维护一个commit
+        point用来记录当前所有可用的segment
     2.分布式相关：
         a.MasterNode:负责维护索引元数据，切换主分片和副本分片身份等工作，如果masterNode挂了会选举一个新的节点
         b.分片:对于一个index,es会将其数据保存到多个节点(其目的在于加快读写IO,不同分片可并行读和并行写),
@@ -32,10 +35,11 @@
         其他的都是副分片,数据写入时是写到主分片,副分片会复制分片数据,如果主分片挂了,MasterNode会选择一个副分片成为主分片
 五.es的写入数据操作：
     1.协调节点(coordinating node):转发客户端请求到目标节点的节点,es中所有的节点都是协调节点
-    2. 请求发送到对应节点和主分片后的过程:
+    2.协调节点如果确定发送给哪个主分片(路由算法):shard = hash(routing) % number_of_primary_shards(routing为任意字符串)
+    3.请求发送到对应节点和主分片后的过程:
         a.将数据写入内存缓存区(buffer)
         b.将数据写道translog缓存区
-        c.每隔1s数据从buffer中refresh到FileSystemCache内生成segment，此时就可通过倒排索引查找到写入的数据了(但segment还在内存中)
+        c.每隔1s数据从buffer中refresh到FileSystemCache内生成segment,此时就可通过倒排索引查找到写入的数据了(但segment还在内存中)
         d.清空buffer
         e.每隔5s把translog flush到磁盘
         f.定期，定量从FileSystemCache结合stanslog内容,flush index到磁盘
