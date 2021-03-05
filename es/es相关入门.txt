@@ -21,7 +21,7 @@
     1.es中相关术语与mysql的对应：
         a.index相当于mysql中的表
         b.document:相当于mysql中的一行元素
-        c.field:相当于mysql中的一列
+        c.field:相当于mysql中的一列(es为每个field都建立了一个倒排索引)
         d.mapping:相当于MySQL中的数据库
         e.DSL:相当于sql语句
         f.translog:记录了接受到的document
