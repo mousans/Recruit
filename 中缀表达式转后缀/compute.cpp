@@ -12,10 +12,13 @@ bool judge(char s){
 }
 
 bool compare(char a,char b){
-    if(a == '+' || a =='-' || a == '('){
-        return true;
+    if( a == '('){
+        return false;
     }
-    if(b =='*' || b == '/'){
+   if( b == '+' || b == '-'){
+       return true;
+   }
+    if( a == '*' || a == '/'){
         return true;
     }
     return false;
@@ -39,7 +42,7 @@ bool isNum(char a){
  * 1.遇到数字直接输出
  * 2.遇到(直接入栈
  * 3.遇到)将符号栈输出知道(
- * 4.对于其他符号,碰到优先级小于等于它的都输出,然后自己入栈
+ * 4.对于其他符号,碰到优先级大于等于它的都输出,然后自己入栈
  * 
  * */
 vector<string> midToAfter(string s){
