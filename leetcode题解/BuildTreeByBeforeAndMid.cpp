@@ -17,7 +17,7 @@ struct TreeNode {
  * 前序遍历的vector内的节点为： 根节点|左子树节点|右子树节点
  * 中序遍历的vector内的节点为： 左子树节点|根节点|右节点
  * 所以每次只需要确定两个数组内的根节点位置就能划分出左右子树，所以不用重新构造数组，直接用下标表示，递归结束条件为r>l表明没有节点了
- * */
+ * */    
 class Solution {
 public:
     unordered_map<int, int> mps;
