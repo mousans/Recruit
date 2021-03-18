@@ -86,5 +86,6 @@ public:
 
 int main()
 {
-
+    string *a = new string("1231");
+    getchar();
 }

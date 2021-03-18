@@ -57,7 +57,7 @@
     *由于数据写入时,会先写translog到缓存区,1s后生成内存的segment,所以Get操作可以说是实时的,而Query操作有1s延迟
 七.es的三种查询模式:
     1.QUERY_AND_FETCH（查询完就返回整个Doc内容）
-    2.QUERY_THEN_FETCH（先查询出对应的Doc id ，然后再根据Doc id 匹配去对应的文档）
+    2.(默认)QUERY_THEN_FETCH（先查询出对应的Doc id ，然后再根据Doc id 匹配去对应的文档）
     3.DFS_QUERY_THEN_FETCH(先算分，再查询)ps:这里的分指的是词频率和文档频率，频率越高,相关性也强,分越高
 八.QUERY_THEN_FETCH流程：
     a.客户端将请求发送到某个节点
